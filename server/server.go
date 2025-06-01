@@ -57,6 +57,7 @@ func setupRouter(store stores.UserStore) *gin.Engine {
 	auth := r.Group("/")
 	auth.Use(middleware.AuthMiddleware(getJwtSecret()))
 	auth.GET("/me", handleMe(store))
+	auth.POST("/logout", handleLogout())
 	return r
 }
 
@@ -141,5 +142,13 @@ func handleMe(store stores.UserStore) gin.HandlerFunc {
 		}
 		storedUser.Password = "" // Don't return the password
 		c.JSON(200, storedUser)
+	}
+}
+
+func handleLogout() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Clear the token cookie
+		c.SetCookie("token", "", -1, "/", "", useSecureCookie(), true)
+		c.JSON(200, gin.H{"message": "Logged out successfully"})
 	}
 }
