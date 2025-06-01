@@ -36,7 +36,7 @@ func checkPassword(hash, password string) error {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 }
 
-func useHttpsCookie() bool {
+func useSecureCookie() bool {
 	return gin.Mode() == gin.ReleaseMode
 }
 
@@ -121,7 +121,7 @@ func handleLogin(store stores.UserStore) gin.HandlerFunc {
 			c.JSON(500, gin.H{"error": "Failed to create token"})
 			return
 		}
-		c.SetCookie("token", tokenString, 3600, "/", "", useHttpsCookie(), true)
+		c.SetCookie("token", tokenString, 3600, "/", "", useSecureCookie(), true)
 		c.JSON(200, gin.H{"message": "Login successful"})
 	}
 }
