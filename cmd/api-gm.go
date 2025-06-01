@@ -1,13 +1,18 @@
 package main
 
-import "github.com/gin-gonic/gin"
-
-func handleIndex(c *gin.Context) {
-	c.String(200, "Hello, World!")
-}
+import (
+	"cmd/server"
+	"cmd/stores"
+)
 
 func main() {
-	r := gin.Default()
-	r.GET("/", handleIndex)
-	r.Run(":8080")
+	store, err := stores.NewUserStore()
+	if err != nil {
+		println("Error initializing store:", err)
+		return
+	}
+	err = server.Start(store)
+	if err != nil {
+		println("Error starting server:", err)
+	}
 }
