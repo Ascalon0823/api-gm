@@ -2,3 +2,7 @@ build/
 .env
 go.work
 go.work.sum
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
