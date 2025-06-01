@@ -51,6 +51,7 @@ func generateToken(userID uint) (string, error) {
 
 func setupRouter(store stores.UserStore) *gin.Engine {
 	r := gin.Default()
+	r.Use(middleware.CorsMiddleware())
 	r.POST("/register", handleRegister(store))
 	r.POST("/login", handleLogin(store))
 	auth := r.Group("/")
