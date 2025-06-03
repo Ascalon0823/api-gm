@@ -7,7 +7,7 @@ import (
 )
 
 func SendResetEmail(to, token string) error {
-	resetURL := fmt.Sprintf("http://localhost:5173/password-reset?token=%s", token)
+	resetURL := fmt.Sprintf("http://localhost:5173/password-reset?token=%s&email=%s", token, to)
 
 	m := mail.NewMessage()
 	m.SetHeader("From", "noreply@gm.gg")

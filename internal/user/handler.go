@@ -169,7 +169,7 @@ func handleForgotPassword(store UserStore) gin.HandlerFunc {
 			return
 		}
 		println("Forgot password request for email:", storedUser.Email, "with reset token:", storedUser.ResetToken)
-		if err := email.SendResetEmail(req.Email, "123"); err != nil {
+		if err := email.SendResetEmail(req.Email, storedUser.ResetToken); err != nil {
 			println("Failed to send reset email:", err)
 			c.JSON(500, gin.H{"error": "Failed to send password reset email"})
 			return
