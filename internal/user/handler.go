@@ -1,6 +1,7 @@
 package user
 
 import (
+	"cmd/email"
 	"net/http"
 	"time"
 
@@ -28,9 +29,8 @@ func handleRegister(store UserStore) gin.HandlerFunc {
 			return
 		}
 		user := User{
-			Email:     req.Email,
-			Password:  hashedPassword,
-			CreatedAt: time.Now(),
+			Email:    req.Email,
+			Password: hashedPassword,
 		}
 		if err := store.Create(c.Request.Context(), &user); err != nil {
 			c.JSON(500, gin.H{"error": "Failed to create user"})
@@ -140,5 +140,87 @@ func handleChangePassword(store UserStore) gin.HandlerFunc {
 		}
 
 		c.JSON(200, gin.H{"message": "Password changed successfully"})
+	}
+}
+
+func handleForgotPassword(store UserStore) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Email string `json:"email"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(400, gin.H{"error": "Invalid input"})
+			return
+		}
+
+		storedUser, err := store.FindByEmail(c.Request.Context(), req.Email)
+		if err != nil {
+			c.JSON(200, gin.H{"message": "Password reset link sent to your email if the account exists"})
+			return
+		}
+		storedUser.ResetToken, err = generateResetToken()
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Failed to generate reset token"})
+			return
+		} // This should be a generated token
+		storedUser.ResetExpiry = time.Now().Add(24 * time.Hour) // Set expiry for 24 hours
+		if err := store.Update(c.Request.Context(), storedUser); err != nil {
+			c.JSON(500, gin.H{"error": "Failed to update user for password reset"})
+			return
+		}
+		println("Forgot password request for email:", storedUser.Email, "with reset token:", storedUser.ResetToken)
+		if err := email.SendResetEmail(req.Email, "123"); err != nil {
+			println("Failed to send reset email:", err)
+			c.JSON(500, gin.H{"error": "Failed to send password reset email"})
+			return
+		}
+
+		c.JSON(200, gin.H{"message": "Password reset link sent to your email if the account exists"})
+	}
+}
+func handlePasswordReset(store UserStore) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			Email              string `json:"email"`
+			PasswordResetToken string `json:"password_reset_token"`
+			NewPassword        string `json:"new_password"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(400, gin.H{"error": "Invalid input"})
+			return
+		}
+		if req.PasswordResetToken == "" || req.NewPassword == "" {
+			c.JSON(400, gin.H{"error": "Invalid input - token and new password are required"})
+			return
+		}
+		storedUser, err := store.FindByEmail(c.Request.Context(), req.Email)
+		if err != nil {
+			c.JSON(400, gin.H{"error": "Invalid input - user not found"})
+			return
+		}
+		if storedUser.ResetToken != req.PasswordResetToken {
+			c.JSON(400, gin.H{"error": "Invalid input - token does not match"})
+			return
+		}
+		if time.Now().After(storedUser.ResetExpiry) {
+			c.JSON(400, gin.H{"error": "Invalid input - token has expired"})
+			return
+		}
+		storedUser.ResetToken = ""           // Clear the reset token after use
+		storedUser.ResetExpiry = time.Time{} // Clear the expiry time
+		println("Resetting password for user:", req.Email, "with token:", req.PasswordResetToken)
+		hashedNewPassword, err := hashPassword(req.NewPassword)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Failed to hash new password"})
+			return
+		}
+
+		storedUser.Password = hashedNewPassword
+		if err := store.Update(c.Request.Context(), storedUser); err != nil {
+			c.JSON(500, gin.H{"error": "Failed to update password"})
+			return
+		}
+
+		c.JSON(200, gin.H{"message": "Password reset successfully"})
 	}
 }
