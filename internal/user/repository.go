@@ -1,29 +1,39 @@
-package stores
+package user
 
 import (
+	"cmd/stores"
 	"context"
+	"log"
+	"os"
 
+	"github.com/joho/godotenv"
 	"gorm.io/gorm"
 )
 
+type UserStore interface {
+	FindByID(ctx context.Context, id uint) (*User, error)
+	FindByEmail(ctx context.Context, email string) (*User, error)
+	Create(ctx context.Context, user *User) error
+	Update(ctx context.Context, user *User) error
+}
+
+func NewUserStore() (UserStore, error) {
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, falling back to environment variables")
+		return nil, err
+	}
+	dbDialect := os.Getenv("DB_DIALECT")
+	dsn := os.Getenv("DB_DSN")
+	gormDB, err := stores.NewGormDB(dbDialect, dsn)
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+		return nil, err
+	}
+	return NewGormUserStore(gormDB), nil
+}
+
 type GormUserStore struct {
 	db *gorm.DB
-}
-type DialectorFunc func(dsn string) gorm.Dialector
-
-var dialectorRegistry = make(map[string]DialectorFunc)
-
-func RegisterDialector(name string, dialectorFunc DialectorFunc) {
-	dialectorRegistry[name] = dialectorFunc
-}
-
-func NewGormDB(dialect, dsn string) (*gorm.DB, error) {
-	dialectorFunc, exists := dialectorRegistry[dialect]
-	if !exists {
-		return nil, gorm.ErrUnsupportedDriver
-	}
-	dialector := dialectorFunc(dsn)
-	return gorm.Open(dialector, &gorm.Config{})
 }
 
 func NewGormUserStore(db *gorm.DB) *GormUserStore {
