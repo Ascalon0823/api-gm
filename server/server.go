@@ -58,6 +58,7 @@ func setupRouter(store stores.UserStore) *gin.Engine {
 	auth.Use(middleware.AuthMiddleware(getJwtSecret()))
 	auth.GET("/me", handleMe(store))
 	auth.POST("/logout", handleLogout())
+	auth.POST("/change-password", handleChangePassword(store))
 	return r
 }
 
@@ -150,5 +151,49 @@ func handleLogout() gin.HandlerFunc {
 		// Clear the token cookie
 		c.SetCookie("token", "", -1, "/", "", useSecureCookie(), true)
 		c.JSON(200, gin.H{"message": "Logged out successfully"})
+	}
+}
+
+func handleChangePassword(store stores.UserStore) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var req struct {
+			OldPassword string `json:"old_password"`
+			NewPassword string `json:"new_password"`
+		}
+		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(400, gin.H{"error": "Invalid input"})
+			return
+		}
+
+		userID, exists := c.Get("userID")
+		if !exists {
+			c.JSON(401, gin.H{"error": "Unauthorized"})
+			return
+		}
+		println("Changing password for user ID:", userID.(uint))
+		storedUser, err := store.FindByID(c.Request.Context(), userID.(uint))
+		if err != nil {
+			c.JSON(404, gin.H{"error": "User not found"})
+			return
+		}
+
+		if err := checkPassword(storedUser.Password, req.OldPassword); err != nil {
+			c.JSON(401, gin.H{"error": "Old password is incorrect"})
+			return
+		}
+
+		hashedNewPassword, err := hashPassword(req.NewPassword)
+		if err != nil {
+			c.JSON(500, gin.H{"error": "Failed to hash new password"})
+			return
+		}
+
+		storedUser.Password = hashedNewPassword
+		if err := store.Update(c.Request.Context(), storedUser); err != nil {
+			c.JSON(500, gin.H{"error": "Failed to update password"})
+			return
+		}
+
+		c.JSON(200, gin.H{"message": "Password changed successfully"})
 	}
 }
